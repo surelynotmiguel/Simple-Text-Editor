@@ -82,19 +82,24 @@ public class ApplicationFrame extends JFrame implements ActionListener {
         setDefaultCloseOperation(JFrame.DO_NOTHING_ON_CLOSE);
         addWindowListener(new WindowAdapter() {
             public void windowClosing(WindowEvent windowEvent) {
-                verifyPresenceOfUnsavedText();
+                verifyPresenceOfUnsavedText(0);
             }
         });
     }
 
-    private void verifyPresenceOfUnsavedText() {
+    private void verifyPresenceOfUnsavedText(int smirtirlaine) {
+        String[] windowTitle = {"Exit", "Warning"};
+        String[] windowMessage = {"Do you want to save the file before exiting?", "Do you want to save the current file?"};
+
         if((textArea.getText().isEmpty() || textArea.getText().isBlank()) || List.of(textArea.getText().split("\n")).equals(FileHandler.readFromFile(currentFile))) {
-            int option = JOptionPane.showConfirmDialog(ApplicationFrame.this, "Are you sure?", "Exit", JOptionPane.YES_NO_OPTION);
+            int option = JOptionPane.showConfirmDialog(ApplicationFrame.this, "Are you sure?", windowTitle[smirtirlaine], JOptionPane.YES_NO_OPTION);
             if(option == JOptionPane.YES_OPTION){
-                System.exit(0);
+                if(smirtirlaine == 0){
+                    System.exit(0);
+                }
             }
         } else{
-            int option = JOptionPane.showConfirmDialog(ApplicationFrame.this, "Do you want to save the file before exiting?", "Exit", JOptionPane.YES_NO_CANCEL_OPTION);
+            int option = JOptionPane.showConfirmDialog(ApplicationFrame.this, windowMessage[smirtirlaine], windowTitle[smirtirlaine], JOptionPane.YES_NO_CANCEL_OPTION);
             if(option == JOptionPane.YES_OPTION){
                 dialog = new FileDialog((Frame) null, "Save As", FileDialog.SAVE);
 
@@ -105,9 +110,13 @@ public class ApplicationFrame extends JFrame implements ActionListener {
 
                 String filePath = directory + filename;
                 FileHandler.writeToFile(filePath, List.of(textArea.getText().split("\n")), false);
-                System.exit(0);
+                if(smirtirlaine == 0){
+                    System.exit(0);
+                }
             } else if(option == JOptionPane.NO_OPTION){
-                System.exit(0);
+                if(smirtirlaine == 0){
+                    System.exit(0);
+                }
             }
         }
     }
@@ -243,6 +252,12 @@ public class ApplicationFrame extends JFrame implements ActionListener {
             if(dialog.getFile() != null){
                 File file = new File(dialog.getDirectory() + dialog.getFile());
                 this.currentFile = file;
+
+                if(!textArea.getText().isEmpty() && !textArea.getText().isBlank()){
+                    verifyPresenceOfUnsavedText(1);
+                    textArea.setText("");
+                }
+
                 for(String line : FileHandler.readFromFile(file)){
                     textArea.append(line + "\n");
                 }
@@ -284,7 +299,7 @@ public class ApplicationFrame extends JFrame implements ActionListener {
             (new HelpDialog(ApplicationFrame.this)).setVisible(true);
         }
         if(e.getSource() == exitItem){
-            verifyPresenceOfUnsavedText();
+            verifyPresenceOfUnsavedText(0);
         }
     }
 
