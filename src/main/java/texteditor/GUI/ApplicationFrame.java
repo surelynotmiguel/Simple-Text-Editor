@@ -486,7 +486,7 @@ public class ApplicationFrame extends JFrame implements ActionListener {
 
         if (directory != null && filename != null) {
             String filePath = directory + filename;
-            FileHandler.createFile(filePath, false);
+            FileHandler.createFile(filePath);
             System.out.println("File saved on: " + filePath);
         } else {
             System.out.println("No directory selected.");

@@ -21,7 +21,7 @@ public class FileHandler {
 
         if (!defaultWorkspace.exists()) {
             if(defaultWorkspace.mkdirs()){
-                createFile(defaultWorkspace.getAbsolutePath() + "\\peekaboo", true);
+                createControlFile(defaultWorkspace.getAbsolutePath() + "\\control");
                 System.out.println("Default successfully workspace created at " + defaultWorkspace.getAbsolutePath());
             } else {
                 System.err.println("Failed to create default workspace at " + defaultWorkspace.getAbsolutePath());
@@ -66,15 +66,27 @@ public class FileHandler {
         return "other";
     }
 
-    public static void createFile(String filePath, boolean createControlFile){
+    private static void createControlFile(String filePath){
+        File controlFile = new File(filePath);
+
+        try{
+            if(controlFile.createNewFile()){
+                Path path = Paths.get(controlFile.getAbsolutePath());
+                Files.setAttribute(path, "dos:hidden", true);
+                System.out.println("Control file successfully created.");
+            } else{
+                System.out.println("Control file already exists.");
+            }
+        } catch (Exception e){
+            Global.printErrorAndFinish("An error occurred while creating the control file " + controlFile.getName(), e);
+        }
+    }
+
+    public static void createFile(String filePath){
         File file = new File(filePath);
         try{
             if(file.createNewFile()){
-                if(createControlFile){
-                    Path path = Paths.get(file.getAbsolutePath());
-                    Files.setAttribute(path, "dos:hidden", true);
-                }
-                System.out.println(createControlFile ? "File successfully created!" : "Control file successfully created!");
+                System.out.println("File successfully created!");
             }else{
                 System.out.println("File already exists.");
             }
