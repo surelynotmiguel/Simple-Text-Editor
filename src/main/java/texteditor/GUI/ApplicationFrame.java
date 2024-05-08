@@ -1,9 +1,9 @@
-package GUI;
+package texteditor.GUI;
 
-import DTO.FileHandler;
-import GUI.Dialog.AboutDialog;
-import GUI.Dialog.HelpDialog;
-import GUI.Dialog.PreferencesDialog;
+import texteditor.DTO.FileHandler;
+import texteditor.GUI.Dialog.AboutDialog;
+import texteditor.GUI.Dialog.HelpDialog;
+import texteditor.GUI.Dialog.PreferencesDialog;
 
 import javax.imageio.ImageIO;
 import javax.swing.*;
@@ -20,13 +20,17 @@ import javax.swing.border.Border;
 import javax.swing.border.CompoundBorder;
 import javax.swing.border.EmptyBorder;
 import javax.swing.border.MatteBorder;
-import javax.swing.event.CaretEvent;
-import javax.swing.event.CaretListener;
-import javax.swing.event.DocumentEvent;
-import javax.swing.event.DocumentListener;
+import javax.swing.event.*;
 import javax.swing.text.*;
+import javax.swing.tree.DefaultMutableTreeNode;
+import javax.swing.tree.DefaultTreeModel;
+import javax.swing.tree.TreeNode;
+import java.nio.file.*;
+import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.List;
+
+import static java.nio.file.StandardWatchEventKinds.ENTRY_CREATE;
 
 public class ApplicationFrame extends JFrame implements ActionListener {
     @Serial
@@ -34,14 +38,25 @@ public class ApplicationFrame extends JFrame implements ActionListener {
 
     private JTextArea textArea;
     private JPanel contentPanel;
+    private JPanel fileExplorerPanel;
+    private JTree tree;
     private JMenuItem createItem;
     private JMenuItem openItem;
+    private JMenuItem openFolderItem;
     private JMenuItem saveItem;
+    private JMenuItem cutItem;
+    private JMenuItem copyItem;
+    private JMenuItem pasteItem;
+    private JMenuItem selectAllItem;
     private JMenuItem preferencesItem;
+    private JMenuItem fontItem;
+    private JMenuItem fontSizeItem;
+    private JMenuItem fontStyleItem;
     private JMenuItem aboutItem;
     private JMenuItem helpItem;
     private JMenuItem exitItem;
     private File currentFile;
+    private String currentDirectory;
     private FileDialog dialog;
     private BufferedImage icon;
     private static ApplicationFrame instance;
@@ -52,6 +67,8 @@ public class ApplicationFrame extends JFrame implements ActionListener {
         configureFrame();
         createAndAddMenuBar();
         addListenersMenu(this);
+        FileHandler.createDefaultWorkSpaceFolder();
+        currentDirectory = Global.FILE_EXPLORER_DEFAULT_PATH;
         addComponents();
     }
 
@@ -87,34 +104,26 @@ public class ApplicationFrame extends JFrame implements ActionListener {
         });
     }
 
-    private void verifyPresenceOfUnsavedText(int smirtirlaine) {
+    private void verifyPresenceOfUnsavedText(int index) {
         String[] windowTitle = {"Exit", "Warning"};
         String[] windowMessage = {"Do you want to save the file before exiting?", "Do you want to save the current file?"};
 
-        if((textArea.getText().isEmpty() || textArea.getText().isBlank()) || List.of(textArea.getText().split("\n")).equals(FileHandler.readFromFile(currentFile))) {
-            int option = JOptionPane.showConfirmDialog(ApplicationFrame.this, "Are you sure?", windowTitle[smirtirlaine], JOptionPane.YES_NO_OPTION);
+        if((textArea.getText().isEmpty() || textArea.getText().isBlank()) || (currentFile != null && List.of(textArea.getText().split("\n")).equals(FileHandler.readFromFile(currentFile)))) {
+            int option = JOptionPane.showConfirmDialog(ApplicationFrame.this, "Are you sure?", windowTitle[index], JOptionPane.YES_NO_OPTION);
             if(option == JOptionPane.YES_OPTION){
-                if(smirtirlaine == 0){
+                if(index == 0){
                     System.exit(0);
                 }
             }
         } else{
-            int option = JOptionPane.showConfirmDialog(ApplicationFrame.this, windowMessage[smirtirlaine], windowTitle[smirtirlaine], JOptionPane.YES_NO_CANCEL_OPTION);
+            int option = JOptionPane.showConfirmDialog(ApplicationFrame.this, windowMessage[index], windowTitle[index], JOptionPane.YES_NO_CANCEL_OPTION);
             if(option == JOptionPane.YES_OPTION){
-                dialog = new FileDialog((Frame) null, "Save As", FileDialog.SAVE);
-
-                dialog.setVisible(true);
-
-                String directory = dialog.getDirectory();
-                String filename = dialog.getFile();
-
-                String filePath = directory + filename;
-                FileHandler.writeToFile(filePath, List.of(textArea.getText().split("\n")), false);
-                if(smirtirlaine == 0){
+                saveFile();
+                if(index == 0){
                     System.exit(0);
                 }
             } else if(option == JOptionPane.NO_OPTION){
-                if(smirtirlaine == 0){
+                if(index == 0){
                     System.exit(0);
                 }
             }
@@ -123,46 +132,94 @@ public class ApplicationFrame extends JFrame implements ActionListener {
 
     private void createAndAddMenuBar(){
         JMenuBar menuBar = new JMenuBar();
-        JMenu fileMenu = new JMenu("File");
+        JMenu fileMenu = new JMenu(Global.MENU_NAMES[0]);
         fileMenu.setMnemonic('F');
-        JMenu editMenu = new JMenu("Edit");
+        JMenu editMenu = new JMenu(Global.MENU_NAMES[1]);
         editMenu.setMnemonic('E');
-        JMenu helpMenu = new JMenu("Help");
+        JMenu formatMenu = new JMenu(Global.MENU_NAMES[2]);
+        formatMenu.setMnemonic('O');
+        JMenu helpMenu = new JMenu(Global.MENU_NAMES[3]);
         helpMenu.setMnemonic('H');
 
-        createItem = new JMenuItem("New");
+        createItem = new JMenuItem(Global.FILE_MENU_ITEMS[0]);
         createItem.setMnemonic('N');
-        openItem = new JMenuItem("Open");
+        openItem = new JMenuItem(Global.FILE_MENU_ITEMS[1]);
         openItem.setMnemonic('O');
-        saveItem = new JMenuItem("Save");
+        openFolderItem = new JMenuItem(Global.FILE_MENU_ITEMS[2]);
+        openFolderItem.setMnemonic('F');
+        saveItem = new JMenuItem(Global.FILE_MENU_ITEMS[3]);
         saveItem.setMnemonic('S');
-        preferencesItem = new JMenuItem("Preferences");
-        preferencesItem.setMnemonic('P');
-        aboutItem = new JMenuItem("About");
-        aboutItem.setMnemonic('A');
-        helpItem =  new JMenuItem("Help");
-        helpItem.setMnemonic('H');
-        exitItem = new JMenuItem("Exit");
+        exitItem = new JMenuItem(Global.FILE_MENU_ITEMS[5]);
         exitItem.setMnemonic('E');
+
+        cutItem = new JMenuItem(Global.EDIT_MENU_ITEMS[0]);
+        cutItem.setMnemonic('C');
+        copyItem = new JMenuItem(Global.EDIT_MENU_ITEMS[1]);
+        copyItem.setMnemonic('O');
+        pasteItem = new JMenuItem(Global.EDIT_MENU_ITEMS[2]);
+        pasteItem.setMnemonic('P');
+        selectAllItem = new JMenuItem(Global.EDIT_MENU_ITEMS[3]);
+        selectAllItem.setMnemonic('A');
+        preferencesItem = new JMenuItem(Global.EDIT_MENU_ITEMS[4]);
+        preferencesItem.setMnemonic('P');
+
+        fontItem = new JMenuItem(Global.FORMAT_MENU_ITEMS[0]);
+        fontItem.setMnemonic('F');
+        fontSizeItem = new JMenuItem(Global.FORMAT_MENU_ITEMS[1]);
+        fontSizeItem.setMnemonic('S');
+        fontStyleItem = new JMenuItem(Global.FORMAT_MENU_ITEMS[2]);
+        fontStyleItem.setMnemonic('T');
+
+        helpItem =  new JMenuItem(Global.HELP_MENU_ITEMS[0]);
+        helpItem.setMnemonic('H');
+        aboutItem = new JMenuItem(Global.HELP_MENU_ITEMS[1]);
+        aboutItem.setMnemonic('A');
 
         createItem.addActionListener(this);
         openItem.addActionListener(this);
+        openFolderItem.addActionListener(this);
         saveItem.addActionListener(this);
+
+        cutItem.addActionListener(this);
+        copyItem.addActionListener(this);
+        pasteItem.addActionListener(this);
+        selectAllItem.addActionListener(this);
         preferencesItem.addActionListener(this);
+
+        fontItem.addActionListener(this);
+        fontSizeItem.addActionListener(this);
+        fontStyleItem.addActionListener(this);
+
         aboutItem.addActionListener(this);
         helpItem.addActionListener(this);
         exitItem.addActionListener(this);
 
+        createItem.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_N, InputEvent.CTRL_DOWN_MASK));
+        saveItem.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_S, InputEvent.CTRL_DOWN_MASK));
+        exitItem.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_F4, InputEvent.ALT_DOWN_MASK));
+
         fileMenu.add(createItem);
         fileMenu.add(openItem);
+        fileMenu.add(openFolderItem);
         fileMenu.add(saveItem);
         fileMenu.add(exitItem);
+
+        editMenu.add(cutItem);
+        editMenu.add(copyItem);
+        editMenu.add(pasteItem);
+        editMenu.add(selectAllItem);
         editMenu.add(preferencesItem);
+
+        formatMenu.add(fontItem);
+        formatMenu.add(fontSizeItem);
+        formatMenu.add(fontStyleItem);
+
         helpMenu.add(helpItem);
         helpMenu.add(aboutItem);
 
         menuBar.add(fileMenu);
         menuBar.add(editMenu);
+        menuBar.add(formatMenu);
         menuBar.add(helpMenu);
         menuBar.setBackground(Color.LIGHT_GRAY);
 
@@ -171,6 +228,7 @@ public class ApplicationFrame extends JFrame implements ActionListener {
 
     private void addComponents() {
         addContentPanel();
+        addFileExplorerPanel();
         addTextArea();
     }
 
@@ -184,10 +242,139 @@ public class ApplicationFrame extends JFrame implements ActionListener {
         this.add(contentPanel, BorderLayout.CENTER);
     }
 
+    private void addFileExplorerPanel(){
+        fileExplorerPanel = new JPanel(new BorderLayout());
+        fileExplorerPanel.setPreferredSize(new Dimension(300, Integer.MAX_VALUE));
+        fileExplorerPanel.setBackground(Color.LIGHT_GRAY);
+
+        Border border = BorderFactory.createTitledBorder(Global.FILE_EXPLORER_TITLE);
+        fileExplorerPanel.setBorder(border);
+
+        contentPanel.add(fileExplorerPanel, BorderLayout.WEST);
+
+        tree = new JTree();
+        JScrollPane scrollPane = new JScrollPane(tree);
+        fileExplorerPanel.add(scrollPane, BorderLayout.CENTER);
+
+        File directory = new File(Global.FILE_EXPLORER_DEFAULT_PATH);
+        DefaultMutableTreeNode root = new DefaultMutableTreeNode(directory.getName());
+        addFilesToNode(directory, root);
+        DefaultTreeModel treeModel = new DefaultTreeModel(root);
+        tree.setModel(treeModel);
+
+        this.setCurrentDirectoryName(directory.getName());
+
+        // Add listener to handle clicks on a file
+        tree.addMouseListener(new MouseAdapter() {
+            public void mouseClicked(MouseEvent e) {
+                if (e.getClickCount() == 1) {
+                    DefaultMutableTreeNode node = (DefaultMutableTreeNode) tree.getLastSelectedPathComponent();
+                    if(node == null) return;
+                    String nodeName = node.toString();
+                    File file = new File(currentDirectory + "\\" + nodeName);
+                    if(file.isFile()){
+                        currentFile = file;
+                        textArea.setText("");
+                        for(String line : FileHandler.readFromFile(file)){
+                            textArea.append(line + "\n");
+                        }
+                    }
+                } else if(e.getClickCount() == 2){
+                    //TODO: Rename file
+                    System.err.println("Rename file: Feature not implemented yet.");
+                }
+            }
+        });
+
+        // Add listener to handle deletion of a file
+        tree.addKeyListener(new KeyAdapter() {
+            public void keyPressed(KeyEvent e) {
+                if(e.getKeyCode() == KeyEvent.VK_DELETE){
+                    DefaultMutableTreeNode node = (DefaultMutableTreeNode) tree.getLastSelectedPathComponent();
+                    if(node == null) return;
+                    String nodeName = node.toString();
+                    File file = new File(currentDirectory + "\\" + nodeName);
+                    if(file.isFile()){
+                        FileHandler.deleteFile(file.getAbsolutePath());
+                        ((DefaultTreeModel) tree.getModel()).removeNodeFromParent(node);
+                    } else if(file.isDirectory()){
+                        FileHandler.deleteDirectory(file);
+                    }
+                }
+            }
+        });
+
+        try {
+            monitorDirectory(Paths.get(currentDirectory));
+        } catch (IOException ex) {
+            Global.printErrorAndFinish("An error occurred while monitoring the directory.", ex);
+        }
+
+        System.out.println("File Explorer Panel added.");
+    }
+
+    private void monitorDirectory(Path dir) throws IOException {
+        WatchService watcher = FileSystems.getDefault().newWatchService();
+        dir.register(watcher, ENTRY_CREATE);
+
+        Thread thread = new Thread(() -> {
+            while (true) {
+                WatchKey key;
+                try {
+                    key = watcher.take();
+                } catch (InterruptedException e) {
+                    return;
+                }
+
+                for (WatchEvent<?> event : key.pollEvents()) {
+                    WatchEvent.Kind<?> kind = event.kind();
+                    Path newPath = (Path) event.context();
+
+                    if (kind == ENTRY_CREATE) {
+                        if (Files.isDirectory(dir.resolve(newPath))) {
+                            DefaultMutableTreeNode newDirNode = new DefaultMutableTreeNode(newPath.getFileName().toString());
+                            DefaultMutableTreeNode parentNode = findNode((DefaultMutableTreeNode) tree.getModel().getRoot(), dir.getFileName().toString());
+                            if (parentNode != null) {
+                                SwingUtilities.invokeLater(() -> ((DefaultTreeModel) tree.getModel()).insertNodeInto(newDirNode, parentNode, parentNode.getChildCount()));
+                            }
+                        } else {
+                            DefaultMutableTreeNode newFileNode = new DefaultMutableTreeNode(newPath.getFileName().toString());
+                            DefaultMutableTreeNode parentNode = findNode((DefaultMutableTreeNode) tree.getModel().getRoot(), dir.getFileName().toString());
+                            if (parentNode != null) {
+                                SwingUtilities.invokeLater(() -> ((DefaultTreeModel) tree.getModel()).insertNodeInto(newFileNode, parentNode, parentNode.getChildCount()));
+                            }
+                        }
+                    }
+                }
+
+                boolean valid = key.reset();
+                if (!valid) {
+                    break;
+                }
+            }
+        });
+
+        thread.setDaemon(true);
+        thread.start();
+    }
+
+    private DefaultMutableTreeNode findNode(DefaultMutableTreeNode root, String nodeName) {
+        Enumeration<TreeNode> e = root.depthFirstEnumeration();
+
+        while (e.hasMoreElements()) {
+            DefaultMutableTreeNode node = (DefaultMutableTreeNode) e.nextElement();
+            if (node.toString().equals(nodeName)) {
+                return node;
+            }
+        }
+
+        return null;
+    }
+
     private void addTextArea() {
         JPanel textPanel = new JPanel(new BorderLayout());
         textArea = new JTextArea();
-        textArea.setFont(Global.FONT);
+        textArea.setFont(Global.TEXTAREA_DEFAULT_FONT_BOLD);
         int tabCharSize = 2;
         textArea.setTabSize(tabCharSize);
 
@@ -203,8 +390,22 @@ public class ApplicationFrame extends JFrame implements ActionListener {
         contentPanel.add(textPanel, BorderLayout.CENTER);
     }
 
-    public void addFileArea(){
-        //TODO: Add file area
+    private void setCurrentDirectoryName(String directoryName) {
+        Border border = BorderFactory.createTitledBorder(directoryName);
+        fileExplorerPanel.setBorder(border);
+    }
+
+    private void addFilesToNode(File directory, DefaultMutableTreeNode parentNode) {
+        File[] files = directory.listFiles();
+        if (files != null) {
+            for (File file : files) {
+                DefaultMutableTreeNode node = new DefaultMutableTreeNode(file.getName());
+                if (file.isDirectory()) {
+                    addFilesToNode(file, node);
+                }
+                parentNode.add(node);
+            }
+        }
     }
 
     private void addListenersMenu(ActionListener listener) {
@@ -223,10 +424,89 @@ public class ApplicationFrame extends JFrame implements ActionListener {
         }
     }
 
+
+
     public void setDialogIcon(FileDialog dialog){ dialog.setIconImage(this.icon); }
 
     public void actionPerformed(ActionEvent e) {
         if(e.getSource() == createItem){
+            createFile();
+        }
+        if(e.getSource() == openItem){
+            openFile();
+        }
+        if(e.getSource() == saveItem){
+            saveFile();
+        }
+        if(e.getSource() == preferencesItem){
+            (new PreferencesDialog(getInstance())).setVisible(true);
+        }
+        if(e.getSource() == aboutItem){
+            (new AboutDialog(getInstance())).setVisible(true);
+        }
+        if(e.getSource() == helpItem){
+            (new HelpDialog(getInstance())).setVisible(true);
+        }
+        if(e.getSource() == exitItem){
+            verifyPresenceOfUnsavedText(0);
+        }
+
+    }
+
+    private void openFile() {
+        dialog = new FileDialog((Frame) null, "Open File", FileDialog.LOAD);
+
+        setDialogIcon(dialog);
+        dialog.setVisible(true);
+
+        if(dialog.getFile() != null){
+            File file = new File(dialog.getDirectory() + dialog.getFile());
+            this.currentFile = file;
+            this.currentDirectory = dialog.getDirectory();
+
+            if(!textArea.getText().isEmpty() && !textArea.getText().isBlank()){
+                verifyPresenceOfUnsavedText(1);
+                textArea.setText("");
+            }
+
+            for(String line : FileHandler.readFromFile(file)){
+                textArea.append(line + "\n");
+            }
+        }
+    }
+
+    private void createFile(){
+        dialog = new FileDialog((Frame) null, "Save As", FileDialog.SAVE);
+
+        setDialogIcon(dialog);
+        dialog.setVisible(true);
+
+        String directory = dialog.getDirectory();
+        String filename = dialog.getFile();
+
+        if (directory != null && filename != null) {
+            String filePath = directory + filename;
+            FileHandler.createFile(filePath, false);
+            System.out.println("File saved on: " + filePath);
+        } else {
+            System.out.println("No directory selected.");
+        }
+    }
+
+    private void saveFile() {
+        if(currentFile != null){
+            String directory = currentFile.getParent() + "\\";
+            String filename = currentFile.getName();
+
+            String filePath = directory + filename;
+
+            if(List.of(textArea.getText().split("\n")).equals(FileHandler.readFromFile(currentFile))){
+                System.out.println("No changes were made to the file.");
+            } else{
+                FileHandler.writeToFile(filePath, List.of(textArea.getText().split("\n")), false);
+                System.out.println("File saved on: " + filePath);
+            }
+        } else{
             dialog = new FileDialog((Frame) null, "Save As", FileDialog.SAVE);
 
             setDialogIcon(dialog);
@@ -235,71 +515,8 @@ public class ApplicationFrame extends JFrame implements ActionListener {
             String directory = dialog.getDirectory();
             String filename = dialog.getFile();
 
-            if (directory != null && filename != null) {
-                String filePath = directory + filename;
-                FileHandler.createFile(filePath);
-                System.out.println("File saved on: " + filePath);
-            } else {
-                System.out.println("No directory selected.");
-            }
-        }
-        if(e.getSource() == openItem){
-            dialog = new FileDialog((Frame) null, "Open File", FileDialog.LOAD);
-
-            setDialogIcon(dialog);
-            dialog.setVisible(true);
-
-            if(dialog.getFile() != null){
-                File file = new File(dialog.getDirectory() + dialog.getFile());
-                this.currentFile = file;
-
-                if(!textArea.getText().isEmpty() && !textArea.getText().isBlank()){
-                    verifyPresenceOfUnsavedText(1);
-                    textArea.setText("");
-                }
-
-                for(String line : FileHandler.readFromFile(file)){
-                    textArea.append(line + "\n");
-                }
-            }
-        }
-        if(e.getSource() == saveItem || e.getSource() == KeyStroke.getKeyStroke(KeyEvent.VK_S, InputEvent.CTRL_DOWN_MASK)){
-            if(currentFile != null){
-                String directory = currentFile.getParent() + "\\";
-                String filename = currentFile.getName();
-
-                String filePath = directory + filename;
-
-                if(List.of(textArea.getText().split("\n")).equals(FileHandler.readFromFile(currentFile))){
-                    System.out.println("No changes were made to the file.");
-                } else{
-                    FileHandler.writeToFile(filePath, List.of(textArea.getText().split("\n")), false);
-                    System.out.println("File saved on: " + filePath);
-                }
-            } else{
-                dialog = new FileDialog((Frame) null, "Save As", FileDialog.SAVE);
-
-                setDialogIcon(dialog);
-                dialog.setVisible(true);
-
-                String directory = dialog.getDirectory();
-                String filename = dialog.getFile();
-
-                String filePath = directory + filename;
-                FileHandler.createFile(filePath, List.of(textArea.getText().split("\n")), true);
-            }
-        }
-        if(e.getSource() == preferencesItem){
-            (new PreferencesDialog(ApplicationFrame.this)).setVisible(true);
-        }
-        if(e.getSource() == aboutItem){
-            (new AboutDialog(ApplicationFrame.this)).setVisible(true);
-        }
-        if(e.getSource() == helpItem){
-            (new HelpDialog(ApplicationFrame.this)).setVisible(true);
-        }
-        if(e.getSource() == exitItem){
-            verifyPresenceOfUnsavedText(0);
+            String filePath = directory + filename;
+            FileHandler.createFile(filePath, List.of(textArea.getText().split("\n")));
         }
     }
 
@@ -313,7 +530,8 @@ public class ApplicationFrame extends JFrame implements ActionListener {
      *  of a JScrollPane.
      *
      * @author tips4java
-     * @see <a href="https://github.com/tips4java/tips4java/blob/main/source/TextLineNumber.java">TextLineNumber</a>
+     * @see <a href="https://github.com/tips4java/tips4java/blob/main/source/TextLineNumber.java">
+     *      https://github.com/tips4java/tips4java/blob/main/source/TextLineNumber.java</a>
      */
     @SuppressWarnings({"deprecation", "unused"})
     public static class TextLineNumerator extends JPanel implements CaretListener, DocumentListener, PropertyChangeListener {
@@ -334,6 +552,7 @@ public class ApplicationFrame extends JFrame implements ActionListener {
         private boolean updateFont;
         private int borderGap;
         private Color currentLineForeground;
+        private Font currentLineForegroundFont;
         private float digitAlignment;
         private int minimumDisplayDigits;
 
@@ -368,16 +587,25 @@ public class ApplicationFrame extends JFrame implements ActionListener {
         {
             this.component = component;
 
-            setFont(component.getFont().deriveFont(Font.BOLD));
+            setFont( component.getFont().deriveFont(Font.PLAIN) );
 
             setBorderGap(5);
-            //setCurrentLineForeground( Color.RED );
+            setCurrentLineForeground( Color.BLACK );
+            setCurrentLineForegroundFont( component.getFont().deriveFont(Font.BOLD) );
             setDigitAlignment( RIGHT );
             setMinimumDisplayDigits( minimumDisplayDigits );
 
             component.getDocument().addDocumentListener(this);
             component.addCaretListener(this);
             component.addPropertyChangeListener("font", this);
+        }
+
+        private Font getCurrentLineForegroundFont() {
+            return currentLineForegroundFont;
+        }
+
+        private void setCurrentLineForegroundFont(Font font) {
+            this.currentLineForegroundFont = font;
         }
 
         /**
@@ -546,11 +774,12 @@ public class ApplicationFrame extends JFrame implements ActionListener {
             {
                 try
                 {
-                    if (isCurrentLine(rowStartOffset))
-                        g.setColor( getCurrentLineForeground() );
-                    else
-                        g.setColor( getForeground() );
-
+                    if (isCurrentLine(rowStartOffset)) {
+                        g.setFont(getCurrentLineForegroundFont());
+                        g.setColor(getCurrentLineForeground());
+                    } else {
+                        g.setColor(getForeground());
+                    }
                     //  Get the line number as a string and then determine the
                     //  "X" and "Y" offsets for drawing the string.
 
@@ -658,8 +887,8 @@ public class ApplicationFrame extends JFrame implements ActionListener {
         }
 
         //
-//  Implement CaretListener interface
-//
+        //  Implement CaretListener interface
+        //
         @Override
         public void caretUpdate(CaretEvent e)
         {
@@ -673,15 +902,15 @@ public class ApplicationFrame extends JFrame implements ActionListener {
 
             if (lastLine != currentLine)
             {
-//			repaint();
+    //			repaint();
                 getParent().repaint();
                 lastLine = currentLine;
             }
         }
 
         //
-//  Implement DocumentListener interface
-//
+        //  Implement DocumentListener interface
+        //
         @Override
         public void changedUpdate(DocumentEvent e)
         {
@@ -728,8 +957,8 @@ public class ApplicationFrame extends JFrame implements ActionListener {
         }
 
         //
-//  Implement PropertyChangeListener interface
-//
+        //  Implement PropertyChangeListener interface
+        //
         @Override
         public void propertyChange(PropertyChangeEvent evt)
         {
@@ -744,7 +973,7 @@ public class ApplicationFrame extends JFrame implements ActionListener {
                 }
                 else
                 {
-//				repaint();
+    //				repaint();
                     getParent().repaint();
                 }
             }

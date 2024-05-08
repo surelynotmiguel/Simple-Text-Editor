@@ -1,6 +1,6 @@
-package GUI.Dialog;
+package texteditor.GUI.Dialog;
 
-import GUI.Global;
+import texteditor.GUI.Global;
 
 import javax.swing.*;
 import javax.swing.event.HyperlinkEvent;
@@ -27,7 +27,7 @@ public class AboutDialog extends JDialog {
         editorPane.setOpaque(false);
         editorPane.setBorder(BorderFactory.createEmptyBorder(5, 10, 10, 10));
         editorPane.putClientProperty(JEditorPane.HONOR_DISPLAY_PROPERTIES, Boolean.TRUE);
-        editorPane.setFont(Global.FONT);
+        editorPane.setFont(Global.DEFAULT_FONT);
 
         editorPane.addHyperlinkListener(e -> {
             if (e.getEventType() == HyperlinkEvent.EventType.ACTIVATED) {
@@ -61,7 +61,7 @@ public class AboutDialog extends JDialog {
         ImageIcon image = new ImageIcon(Global.AUTHOR_ICON_PATH);
         JLabel imageLabel = new JLabel(new ImageIcon(image.getImage().getScaledInstance(100, 100, Image.SCALE_SMOOTH)));
         JLabel nameLabel = new JLabel("Made by: " + Global.APP_AUTHOR);
-        nameLabel.setFont(Global.FONT.deriveFont(Font.BOLD));
+        nameLabel.setFont(Global.DEFAULT_FONT.deriveFont(Font.BOLD));
 
         panel.add(imageLabel);
         panel.add(Box.createHorizontalStrut(10));

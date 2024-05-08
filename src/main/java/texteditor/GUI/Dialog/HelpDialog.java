@@ -1,6 +1,6 @@
-package GUI.Dialog;
+package texteditor.GUI.Dialog;
 
-import GUI.Global;
+import texteditor.GUI.Global;
 
 import javax.swing.JDialog;
 import javax.swing.JFrame;

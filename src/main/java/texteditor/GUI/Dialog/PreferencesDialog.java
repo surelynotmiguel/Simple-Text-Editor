@@ -1,6 +1,6 @@
-package GUI.Dialog;
+package texteditor.GUI.Dialog;
 
-import GUI.ApplicationFrame;
+import texteditor.GUI.ApplicationFrame;
 
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
